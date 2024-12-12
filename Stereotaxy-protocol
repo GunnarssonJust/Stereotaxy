@@ -1,0 +1,813 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Mar  8 15:23:55 2022
+Modified for criteria in Helios Clinics Schwerin, Germany on Sat Nov 23-30 2024
+.exe-file created with auto-py-to-exe
+
+@authors: Anja Brüggemann, Gunnar Just
+"""
+
+
+import numpy as np
+import scipy as sp
+import tkinter as tk
+from tkinter import simpledialog
+import os
+import docx
+from docx2pdf import convert
+
+
+with open('dvh.txt') as f:
+    matrix=[line.split() for line in f]
+
+
+def search_string_in_file(file_name, string_to_search):
+    """Search for the given string in file and return line number"""
+    """Count lines numbers from 0"""
+
+    line_number = -1
+    # Open the file in read only mode
+    with open(file_name, 'r') as read_obj:
+        # Read all lines in the file one by one
+
+        for line in read_obj:
+            # For each line, check if line contains the string
+            line_number += 1
+            if string_to_search in line:
+                # If yes, then add the line number
+                break
+
+    return line_number
+
+
+# search start line of data
+
+def read_from_line(number_to_start_with, string_to_search):
+    with open('dvh.txt') as f:
+        for i in np.arange(0, number_to_start_with):
+            f, next(f)
+            #print(matrix[i])
+        for line in f:
+            #print(i)
+            i = i+1
+            if string_to_search in line:
+                break
+    return i
+    
+
+
+
+# create numpy-Array from PTV-DVH-Data
+def array_from_dvh_data(string_to_search):
+    # find length of DVH-Data
+    # 1. "Relative dose" and following "Structure:" defines length of data
+    start = search_string_in_file('dvh.txt', string_to_search)+26
+    #print(start)
+    end = read_from_line(start, 'Structure:')
+    #print(end)
+    len_dvh_data = end-start-2  #-2, for subtract number of empty and start line
+    #print(len_dvh_data)
+    first_line_dvh = start
+    #print(first_line_dvh)
+    #print(first_line_dvh)
+    dvh_data = np.array(matrix[first_line_dvh:len_dvh_data+first_line_dvh],dtype=float)
+    for i in range(0,len_dvh_data):
+        dvh_data[i].reshape((1,3))
+    
+    return(dvh_data)
+    
+
+##############################################################################
+lastname = matrix[search_string_in_file('dvh.txt', 'Patient Name')][3]
+lastname = lastname.replace(",", "")
+firstname = matrix[search_string_in_file('dvh.txt', 'Patient Name')][4]
+ID = matrix[search_string_in_file('dvh.txt', 'ID')][3]
+planname_list = matrix[search_string_in_file('dvh.txt', 'Plan')][1:]
+separator = ''
+planname = separator.join(planname_list)
+coursename = matrix[search_string_in_file('dvh.txt', 'Course')][1]
+dosis_prescribed = round(float(matrix[search_string_in_file('dvh.txt','Total dose ')][3]), 2)
+#Verschrieben wird eine Dosis X in Gy. Diese Dosis entspricht der -das PTV umschließenden- Isodose = 100%.
+#Diese Dosis entspricht dann aber Y% der Maximaldosis, die im GTV erreicht werden soll. Ärztelogik nach ICRU91.
+#For example: 65% umschließend heißt, dass die umschließende (=verschriebene) Dosis 65% der maximal zu erzielenden 
+#Dosis im GTV entspricht. Bei einer verschriebenen Gesamtdosis von 35 Gy soll also die maximale Dosis im GTV von etwa
+#53 Gy erreicht werden.
+#dosis auf 80% umschließend? oder 100% oder doch auf 65%? Der Physiker weiß, was Ärzte wollen! Ärzteversteher.
+dose_prescribed_line = search_string_in_file('dvh.txt','% for dose (%):')
+
+#gibt die %-Zahl der maximalen Dosis an, die umschließt
+dose_prescribed_percentage = matrix[dose_prescribed_line][4]
+#print(dose_prescribed_percentage)
+#gibt den Maximalwert im GTV an, der angestrebt wird
+dosis_100 = str(float(dosis_verschrieben)/float(dose_prescribed_percentage)/0.01)
+#print(dosis_100)
+
+############# Achtung, falls relative Dosis in DVH: Angaben in %, sonst in Gy
+
+def find_value(search_word1, search_word2):
+
+    if search_word1 in open('dvh.txt').read():
+        if line[0] == 'Relative ':
+            D_mean_per = matrix[read_from_line(search_string_in_file('dvh.txt', search_word1)-1, search_word2)][3]
+            D_mean_per = round(float(D_mean_per),2)
+            D_mean_Gy = str(float(D_mean_per)/100*float(dosis_100))
+            D_mean_Gy = round(float(D_mean_Gy), 2)
+            
+            return(D_mean_Gy, D_mean_per)
+        
+        else:
+            D_mean_Gy = matrix[read_from_line(search_string_in_file('dvh.txt', search_word1)-1, search_word2)][3]
+            D_mean_Gy = round(float(D_mean_Gy),2)
+            D_mean_per = D_mean_Gy/float(dosis_100)
+            D_mean_per = round(D_mean_per*100, 2)  
+
+            return(D_mean_Gy, D_mean_per)
+
+# Falls mehrere PTVs in Textdatei vorhanden sind, z.B. PTV1, PTV2, etc.:
+if 'Structure: PTV ' in open('dvh.txt').read():
+    ptv_volume_name = 'Structure: PTV '
+else:
+    ROOT_2 = tk.Tk()
+    ROOT_2.withdraw()
+    USER_INPUT = simpledialog.askstring(title='Name des Zielvolumens',prompt = 'Der Name des Zielvolumens ist nicht eindeutig.\n Bitte gib den Namen des zu bestrahlenden Zielvolumens ein: ')
+    ptv_volume_name = 'Structure: ' +USER_INPUT
+
+if USER_INPUT in open('dvh.txt').read():    
+    #type (ptv_volume) = String    
+    ptv_volume = matrix[read_from_line(search_string_in_file('dvh.txt', ptv_volume_name)-1, 'Volume')][2]
+else: 
+    print('Zielvolumen in diesem Plan unbekannt. Bitte erneut eingeben')
+    ROOT_2 = tk.Tk()
+    ROOT_2.withdraw()
+    USER_INPUT = simpledialog.askstring(title='Name des Zielvolumens',prompt = 'Bitte gib den richtigen Namen des zu bestrahlenden Zielvolumens ein: ')
+    ptv_volume_name = 'Structure: ' +USER_INPUT
+    ptv_volume = matrix[read_from_line(search_string_in_file('dvh.txt', ptv_volume_name)-1, 'Volume')][2]
+
+def create_DVH_and_abs_rel_doses(structure):
+    dvh = array_from_dvh_data(structure)
+    
+    # falls "Relative" das erste Wort der Zeile ist, stehen die relativen Dosen in Spalte 0,
+    if line[0] == 'Relative':
+        rel_doses = dvh[:,0]
+        abs_doses = dvh[:,1]
+    # falls nicht, stehen die absoluten Dosen in Spalte 0 und die relativen in Spalte 1    
+    else:
+        rel_doses = dvh[:,1]
+        abs_doses = dvh[:,0]
+    
+    return dvh, abs_doses, rel_doses
+
+# prüfen, ob relative oder absolute Dosis in Spalte 0 stehen:
+line_with_relative_dose = read_from_line(search_string_in_file('dvh.txt', 'Relative dose')-1, 'Relative dose')
+line = matrix[line_with_relative_dose]
+
+
+
+
+'''
+    Create table of PTV-data
+'''  
+#Benutzereingabe, auf wieviel Prozent die umschließende Isodose verschrieben wird
+ROOT = tk.Tk()
+ROOT.withdraw()
+USER_INP = simpledialog.askstring(title='Dosisverschreibung in Prozent',prompt = 'Gib bitte die verschriebene Dosis in Prozent an (65%, 80% oder 100%)')
+dose_in_percent = float(USER_INP)
+
+dvh_ptv, abs_doses_ptv, rel_doses_ptv = create_DVH_and_abs_rel_doses(ptv_volume_name)
+D_mean_Gy, D_mean_per = find_value(ptv_volume_name, 'Mean')
+rel_volumes_ptv = dvh_ptv[:,2]    
+
+def find_D_Vx(x, rel_volumes):
+    # berechne kleinste Differenz zu x und lese dvh_ptv array für absolute und relative Dosen an dieser Position aus
+    D_Vx = round(abs_doses_ptv[np.argmin(abs(rel_volumes-x))], 2) # in Gy
+    D_Vx_rel = round(rel_doses_ptv[np.argmin(abs(rel_volumes-x))], 2) # in % der Plandosis
+    
+    return D_Vx, D_Vx_rel
+
+D_V98, D_V98_rel = find_D_Vx(98, rel_volumes_ptv)
+D_V2, D_V2_rel = find_D_Vx(2, rel_volumes_ptv)
+D_V50, D_V50_rel = find_D_Vx(50, rel_volumes_ptv)
+
+
+
+V_ptv_D100 = dvh_ptv[np.where(rel_doses_ptv==100),2]# Ergebnis in %
+#change type of V_ptv_D100 from array to scalar float
+V_ptv_D100 = float(np.take(V_ptv_D100,0))
+V_ptv_D100 = float(V_ptv_D100)/100*float(ptv_volume) # Ergebnis in cm³
+
+# berechne D(V-35mm³) und D(V=35mm³), 35 mm³ kommen aus ICRU91
+x = float(ptv_volume) - 0.035 # cm³
+y = x/float(ptv_volume) # relatives Volumen in Bezug auf PTV-Volumen
+
+D_Vminus35, D_Vminus35_rel = find_D_Vx(y, rel_volumes_ptv)
+
+
+z = 0.035/float(ptv_volume) # relatives Volumen in Bezug auf PTV-Volumen
+D_Vz, D_Vz_rel = find_D_Vx(z, rel_volumes_ptv)
+
+# erzeuge numpy-Array aus Corpse/Body-Daten
+dvh_corpse = array_from_dvh_data('Body')
+
+# prüfen, wo relative Dosen stehen (Zeile 0 oder 1)
+if line[0] == 'Relative dose [%]':
+     rel_doses_corpse = dvh_corpse[:,0]
+else:
+    rel_doses_corpse = dvh_corpse[:,1]
+
+V_iso_D100 = dvh_corpse[np.where(rel_doses_corpse==100), 2]
+V_iso_D50 = dvh_corpse[np.where(rel_doses_corpse==50), 2]
+V_iso_D100 = float(np.take(V_iso_D100,0))#Ergebnis in % des Body-Volumens
+V_iso_D50 = float(np.take(V_iso_D50,0))  #Ergebnis in % des Body-Volumens
+print(V_iso_D100)
+print(V_iso_D50)
+# corpse volume
+corpse_volume = matrix[read_from_line(search_string_in_file('dvh.txt', 'Body')-1, 'Volume')][2]
+
+V_iso_D100 = float(V_iso_D100)/100*float(corpse_volume) # Ergebnis in cm³
+V_iso_D50 = float(V_iso_D50)/100*float(corpse_volume) # Ergebnis in cm³
+
+paddick = float(V_ptv_D100)**2/(float(ptv_volume)*float(V_iso_D100))
+#print(corpse_volume)
+#print(V_ptv_D100)
+#print(ptv_volume)
+
+paddick = round(paddick, 2)
+
+# Gradienten-Index = V_iso_D50/V_iso_D100
+
+GI = V_iso_D50/V_iso_D100
+GI = round(GI, 2)
+
+
+###############################################################################
+# RISIKOORGANE     ############################################################
+###############################################################################
+
+
+def findV_Dx(x, dvh, abs_doses, volume, volumePTV):
+    V_DxGy = dvh[np.argmin(abs(abs_doses-x)),2] #Ergebnis in %
+    V_DxGy = float(V_DxGy)/100*float(volume) # Ergebnis in cm³
+    if V_DxGy-float(volumePTV) > 0:
+        V_DxGy_noPTV = round(V_DxGy-float(volumePTV), 2) # Ergbnis in cm³ ohne PTV
+    else:
+        V_DxGy_noPTV = 0
+    
+    V_DxGy = round(V_DxGy, 2) # Ergebnis in cm³ auf 2 Nachkommastellen gerundet
+
+    return V_DxGy, V_DxGy_noPTV
+
+# Hirn___________________________________________________________________________
+
+if 'Structure: Brain' in open('dvh.txt').read():
+
+    # # Median-Hirndosis
+    D_med_Gy_hirn, D_med_per_hirn = find_value('Structure: Brain', 'Median')    
+    
+    # # Volumen von Brain, das 10 bzw. 12 Gy erhält
+    dvh_Brain = array_from_dvh_data('Structure: Brain')
+    
+    # # prüfen, wo relative Dosen stehen (Zeile 0 oder 1)
+    if line[0] == 'Relative':
+        abs_doses_Brain = dvh_corpse[:,1]
+    else:
+        abs_doses_Brain = dvh_corpse[:,0]      
+        
+    # Brain-Volumen
+    Brain_volume = matrix[read_from_line(search_string_in_file('dvh.txt', 'Structure: Brain')-1, 'Volume')][2]
+    
+    # #V V10, V12 und V24 inklusive und exklusive PTV Volumen    
+    V_hirn_D10Gy, V_hirn_D10Gy_noPTV = findV_Dx(10, dvh_Brain, abs_doses_Brain, Brain_volume, ptv_volume)
+    V_hirn_D12Gy, V_hirn_D12Gy_noPTV = findV_Dx(12, dvh_Brain, abs_doses_Brain, Brain_volume, ptv_volume)
+    V_hirn_D24Gy, V_hirn_D24Gy_noPTV = findV_Dx(24, dvh_Brain, abs_doses_Brain, Brain_volume, ptv_volume)  
+
+# Hirn Ende________________________________________________________________________________________________________
+
+def output_max(search_structure, structure):
+    # Risikostruktur
+    D_max_Gy = find_value(search_structure, 'Max')
+    # prüfe, ob Variable überhaupt vergeben ist
+    if D_max_Gy:
+        D_max_Gy = D_max_Gy[0]
+        dvh, abs_doses, rel_doses = create_DVH_and_abs_rel_doses(structure)
+        rel_volumes = dvh[:,2]
+        D_V2, D_V2_rel = find_D_Vx(2, rel_volumes)
+    else:
+        D_max_Gy, D_V2, D_V2_rel = None, None, None
+    
+    return D_max_Gy, D_V2, D_V2_rel
+
+def output_mean(search_structure):
+    D_mean = find_value(search_structure, 'Mean')
+     # prüfe, ob Variable überhaupt vergeben ist
+    if D_mean:
+        D_mean = D_mean[0]
+    else:
+        D_mean = None
+    
+    return D_mean
+
+#TODO
+##alphabetisch ordnen
+D_max_Gy_bladder, D_V2_bladder, D_V2_rel_bladder = output_max('Structure: Bladder', 'Bladder')
+D_mean_bladder = output_mean('Structure: Bladder')
+D_max_Gy_z_bladder, D_V2_z_bladder, D_V2_rel_z_bladder = output_max('Structure: z_Bladder', 'z_Bladder')
+D_mean_z_bladder = output_mean('Structure: z_Bladder')
+D_mean_bladder = output_mean('Structure: z_Bladder')
+D_max_Gy_hs, D_V2_hs, D_V2_rel_hs = output_max('Structure: Brainstem', 'Brainstem')
+D_mean_brainstem = output_mean('Structure: Brainstem')
+D_max_Gy_Chiasm, D_V2_Chiasm, D_V2_rel_Chiasm = output_max('Structure: Chiasm', 'Chiasm')
+D_mean_chiasm = output_mean('Structure: Chiasm')
+D_max_Gy_Cochlea_L, D_V2_Cochlea_L, D_V2_rel_Cochlea_L = output_max('Structure: Cochlea_L', 'Cochlea_L')
+D_max_Gy_Cochlea_R, D_V2_Cochlea_R, D_V2_rel_Cochlea_R = output_max('Structure: Cochlea_R', 'Cochlea_R')
+D_max_Gy_duodenum, D_V2_duodenum, D_V2_rel_duodenum = output_max('Structure: Duodenum', 'Duodenum')
+D_mean_duodenum = output_mean('Structure: Duodenum')
+
+D_max_Gy_eye_L, D_V2_eye_L, D_V2_rel_eye_L = output_max('Structure: Eye_L', 'Eye_L')
+D_mean_eye_L = output_mean('Structure: Eye_L')
+D_max_Gy_eye_R, D_V2_eye_R, D_V2_rel_eye_R = output_max('Structure: Eye_R', 'Eye_R')
+D_mean_eye_R = output_mean('Structure: Eye_R')
+
+D_max_Gy_heart, D_V2_heart, D_V2_rel_heart = output_max('Structure: Heart', 'Heart')
+D_mean_heart = output_mean('Structure: Heart')
+
+D_max_Gy_intestine, D_V2_intestine, D_V2_rel_intestine = output_max('Structure: Intestine', 'Intestine')
+D_mean_intestine = output_mean('Structure: Intestine')
+D_max_Gy_kidney_l, D_V2_kidney_l, D_V2_rel_kidney_l = output_max('Structure: Kidney_L', 'Kidney_L')
+D_mean_kidney_l = output_mean('Structure: Kidney_L')
+D_max_Gy_kidney_r, D_V2_kidney_r, D_V2_rel_kidney_r = output_max('Structure: Kidney_R', 'Kidney_R')
+D_mean_kidney_r = output_mean('Structure: Kidney_R')
+
+D_max_Gy_lens_li, D_V2_lens_li, D_V2_rel_lens_li = output_max('Structure: Lens_L', 'Lens_L')
+D_mean_lens_li = output_mean('Structure: Lens_L')
+D_max_Gy_lens_re, D_V2_lens_re, D_V2_rel_lens_re = output_max('Structure: Lens_R', 'Lens_R')
+D_mean_lens_re = output_mean('Structure: Lens_R')
+D_max_Gy_liver, D_V2_liver, D_V2_rel_liver = output_max('Structure: Liver', 'Liver')
+D_mean_liver = output_mean('Structure: Liver')
+D_max_Gy_lung_l, D_V2_lung_l, D_V2_rel_lung_l = output_max('Structure: Lung_L', 'Lung_L')
+D_mean_lung_l = output_mean('Structure: Lung_L')
+D_max_Gy_lung_r, D_V2_lung_r, D_V2_rel_lung_r = output_max('Structure: Lung_R', 'Lung_R')
+D_mean_lung_r = output_mean('Structure: Lung_R')
+D_max_Gy_mandible, D_V2_mandible, D_V2_rel_mandible = output_max('Structure: Mandible', 'Mandible')
+D_mean_mandible = output_mean('Structure: Mandible')
+D_max_Gy_oeso, D_V2_oeso, D_V2_rel_oeso = output_max('Structure: Oesophagus', 'Oesophagus')
+D_mean_oeso = output_mean('Structure: Oesophagus')
+
+D_max_Gy_opt_li, D_V2_opt_li, D_V2_rel_opt_li = output_max('Structure: OpticNerve_L', 'OpticNerve_L')
+D_mean_opt_li = output_mean('Structure: OpticNerve_L')
+D_max_Gy_opt_re, D_V2_opt_re, D_V2_rel_opt_re = output_max('Structure: OpticNerve_R', 'OpticNerve_R')
+D_mean_opt_re = output_mean('Structure: OpticNerve_R')
+D_max_Gy_oral_cavity, D_V2_oral_cavity, D_V2_rel_oral_cavity = output_max('Structure: Oral_Cavity', 'Oral_Cavity')
+D_mean_oral_cavity = output_mean('Structure: Oral_Cavity')
+D_max_Gy_pancreas, D_V2_pancreas, D_V2_rel_pancreas = output_max('Structure: Pancreas', 'Pancreas')
+D_mean_pancreas = output_mean('Structure: Pancreas')
+D_max_Gy_parotid_L, D_V2_parotid_L, D_V2_rel_parotid_L = output_max('Structure: Parotid_L', 'Parotid_L')
+D_mean_parotid_L = output_mean('Structure: Parotid_L')
+D_max_Gy_parotid_R, D_V2_parotid_R, D_V2_rel_parotid_R = output_max('Structure: Parotid_R', 'Parotid_R')
+D_mean_parotid_R = output_mean('Structure: Parotid_R')
+
+D_max_Gy_riva, D_V2_riva, D_V2_rel_riva = output_max('Structure: RIVA', 'RIVA')
+D_mean_riva = output_mean('Structure: RIVA')
+
+D_max_Gy_spinalcanal, D_V2_spinalcanal, D_V2_rel_spinalcanal = output_max('Structure: SpinalCanal', 'SpinalCanal')
+D_max_Gy_myelon, D_V2_myelon, D_V2_rel_myelon = output_max('Structure: SpinalCord', 'SpinalCord')
+D_max_Gy_submandibula_l, D_V2_submandibula_l, D_V2_rel_submandibula_l = output_max('Structure: Submandibula_L', 'Submandibula_L')
+D_mean_submandibula_l = output_mean('Structure: Submandibula_L')
+
+D_max_Gy_submandibula_r, D_V2_submandibula_r, D_V2_rel_submandibula_r = output_max('Structure: Submandibula_R', 'Submandibula_R')
+D_mean_submandibula_r = output_mean('Structure: Submandibula_R')
+#D_max_Gy_ , D_V2_ , D_V2_rel_ = output_max('Structure: ', '')
+
+
+
+
+###############################################################################
+# Output generieren
+
+from docx import Document
+from docx.shared import RGBColor
+from docx.shared import Pt
+
+doc = Document()
+doc.add_heading('Stereotaxie-Dokumentation in Anlehnung an ICRU Report 91', 0)
+
+# Patientendaten
+
+doc.add_heading('Patientendaten', 3)
+para = doc.add_paragraph().add_run()
+table = doc.add_table(rows=2, cols=2)
+
+cell = table.cell(0, 0)
+cell.text = f"Nachname, Vorname: "
+#cell = table.cell(0,1)
+#cell.text = f"{nachname}, {vorname}"
+
+cell = table.cell(0, 1)
+cell = cell.paragraphs[0].add_run(f"{nachname}, {vorname}")
+cell.bold = True
+
+cell = table.cell(1, 0)
+cell.text = f"ID"
+cell = table.cell(1,1)
+cell.text = f"{ID}"
+
+# Plandaten
+
+doc.add_heading('Plandaten', 3)
+para = doc.add_paragraph().add_run()
+table = doc.add_table(rows=4, cols=2)
+
+cell = table.cell(0, 0)
+cell.text = f"Planname"
+cell = table.cell(0,1)
+cell.text = f"{planname}"
+
+cell = table.cell(1, 0)
+cell.text = f"Course"
+cell = table.cell(1,1)
+cell.text = f"{coursename}"
+
+cell = table.cell(2, 0)
+cell.text = f"Plan-Dosis ("+ str(dose_in_percent) +" %)"
+cell = table.cell(2,1)
+cell.text = f"{dosis_verschrieben} Gy"
+
+cell = table.cell(3, 0)
+cell.text = f"Maximaldosis (100 %)"
+cell = table.cell(3,1)
+#print(type(dosis_100))
+#print(type(dose_in_percent))
+cell.text = f"{round(float(dosis_100)/dose_in_percent*100,2)} Gy"
+
+# PTV-Auswertung
+
+doc.add_heading('PTV', 3)
+# Volumen, Paddick, Gradient, Dnearminx2, Dnearmaxx2, D50, D mean
+
+para = doc.add_paragraph().add_run()
+table = doc.add_table(rows=9, cols=2)
+
+cell = table.cell(0, 0)
+cell.text = f"Volumen"
+cell = table.cell(0,1)
+cell.text = f"{ptv_volume} cm³"
+
+cell = table.cell(1, 0)
+cell.text = f"Paddick Conformity Index *"
+
+
+cell = table.cell(1,1)
+cell = cell.paragraphs[0].add_run(f"{paddick}")
+cell.bold = True
+font = cell.font
+if paddick <= 0.5:    
+    font.color.rgb = RGBColor(139, 0, 0)
+elif 0.5 < paddick < 0.7:
+    font.color.rgb = RGBColor(255, 165, 0)
+elif paddick >= 0.7:
+    font.color.rgb = RGBColor(0, 128, 0)
+
+
+
+cell = table.cell(2, 0)
+cell.text = f"Gradient Index *"
+
+cell = table.cell(2,1)
+#cell.text = f"{GI}"
+cell = cell.paragraphs[0].add_run(f"{GI}")
+cell.bold = True
+font = cell.font
+if GI <= 4:    
+    font.color.rgb = RGBColor(0, 128, 0)
+elif 4 < GI < 6:
+    font.color.rgb = RGBColor(255, 165, 0)
+elif GI >= 6:
+    font.color.rgb = RGBColor(139, 0, 0)
+
+
+cell = table.cell(3, 0)
+cell = cell.paragraphs[0].add_run('D')
+cell = table.cell(3, 0)
+cell = cell.paragraphs[0].add_run('near-min')
+cell.font.subscript = True
+cell = table.cell(3, 0)
+cell = cell.paragraphs[0].add_run('(V=98 %)')
+
+cell = table.cell(3, 1)
+cell.text = f"{D_V98} Gy bzw. {D_V98_rel} % der Plan-Dosis"
+
+cell = table.cell(4, 0)
+cell = cell.paragraphs[0].add_run('D')
+cell = table.cell(4, 0)
+cell = cell.paragraphs[0].add_run('near-max')
+cell.font.subscript = True
+cell = table.cell(4, 0)
+cell = cell.paragraphs[0].add_run('(V=2 %)')
+
+cell = table.cell(4, 1)
+cell.text = f"{D_V2} Gy bzw. {D_V2_rel} % der Plan-Dosis"
+
+cell = table.cell(5, 0)
+cell = cell.paragraphs[0].add_run('D')
+cell = table.cell(5, 0)
+cell = cell.paragraphs[0].add_run('near-min')
+cell.font.subscript = True
+cell = table.cell(5, 0)
+cell = cell.paragraphs[0].add_run('(V-35 mm³)')
+
+cell = table.cell(5, 1)
+cell.text = f"{D_Vminus35} Gy bzw. {D_Vminus35_rel} % der Plan-Dosis"
+
+cell = table.cell(6, 0)
+cell = cell.paragraphs[0].add_run('D')
+cell = table.cell(6, 0)
+cell = cell.paragraphs[0].add_run('near-max')
+cell.font.subscript = True
+cell = table.cell(6, 0)
+cell = cell.paragraphs[0].add_run('(V=35 mm³)')
+
+cell = table.cell(6, 1)
+cell.text = f"{D_Vz} Gy bzw. {D_Vz_rel} % der Plan-Dosis"
+
+cell = table.cell(7, 0)
+cell = cell.paragraphs[0].add_run('D(V=50 %)')
+
+cell = table.cell(7, 1)
+cell.text = f"{D_V50} Gy bzw. {D_V50_rel} % der Plan-Dosis"
+
+cell = table.cell(8, 0)
+cell = cell.paragraphs[0].add_run('D')
+cell = table.cell(8, 0)
+cell = cell.paragraphs[0].add_run('mean')
+cell.font.subscript = True
+
+cell = table.cell(8, 1)
+cell.text = f"{D_mean_Gy} Gy bzw. {D_mean_per} % der Plan-Dosis"
+
+
+para = doc.add_paragraph().add_run()
+para = doc.add_paragraph().add_run()
+
+##############################################################################
+# # # # # # # # # Falls Risikoorgane ausgewertet werden: Kommentar entfernen# 
+#Risikoorgane auf nächste Seite, Open Office anderes Layout, Format als Word!!!
+# doc.add_page_break()
+doc.add_heading('Risikoorgane', 2)
+
+# Brain-Auswertung
+
+if 'Structure: Brain' in open('dvh.txt').read():
+
+    doc.add_heading('Brain', 3)
+    para = doc.add_paragraph().add_run()
+    table = doc.add_table(rows=7, cols=2)
+    
+    cell = table.cell(0, 0)
+    cell = cell.paragraphs[0].add_run('V')
+    cell = table.cell(0, 0)
+    cell = cell.paragraphs[0].add_run('Brain-PTV')
+    cell.font.subscript = True
+    cell = table.cell(0, 0)
+    cell = cell.paragraphs[0].add_run('(10 Gy)')
+    
+    cell = table.cell(0, 1)
+    cell.text = f"{V_hirn_D10Gy_noPTV} cm³"
+    
+    
+    cell = table.cell(1, 0)
+    cell = cell.paragraphs[0].add_run('V')
+    cell = table.cell(1, 0)
+    cell = cell.paragraphs[0].add_run('Brain-PTV')
+    cell.font.subscript = True
+    cell = table.cell(1, 0)
+    cell = cell.paragraphs[0].add_run('(12 Gy)')
+    
+    cell = table.cell(1, 1)
+    cell.text = f"{V_hirn_D12Gy_noPTV} cm³"
+    
+    
+    cell = table.cell(2, 0)
+    cell = cell.paragraphs[0].add_run('V')
+    cell = table.cell(2, 0)
+    cell = cell.paragraphs[0].add_run('Brain-PTV')
+    cell.font.subscript = True
+    cell = table.cell(2, 0)
+    cell = cell.paragraphs[0].add_run('(24 Gy)')
+    
+    cell = table.cell(2, 1)
+    cell.text = f"{V_hirn_D24Gy_noPTV} cm³"
+    
+    
+    cell = table.cell(3, 0)
+    cell = cell.paragraphs[0].add_run('V')
+    cell = table.cell(3, 0)
+    cell = cell.paragraphs[0].add_run('Brain inkl. PTV')
+    cell.font.subscript = True
+    cell = table.cell(3, 0)
+    cell = cell.paragraphs[0].add_run('(10 Gy)')
+    
+    cell = table.cell(3, 1)
+    cell.text = f"{V_hirn_D10Gy} cm³"
+    
+    
+    cell = table.cell(4, 0)
+    cell = cell.paragraphs[0].add_run('V')
+    cell = table.cell(4, 0)
+    cell = cell.paragraphs[0].add_run('Brain inkl. PTV')
+    cell.font.subscript = True
+    cell = table.cell(4, 0)
+    cell = cell.paragraphs[0].add_run('(12 Gy)')
+    
+    cell = table.cell(4, 1)
+    cell.text = f"{V_hirn_D12Gy} cm³"
+    
+    cell = table.cell(5, 0)
+    cell = cell.paragraphs[0].add_run('V')
+    cell = table.cell(5, 0)
+    cell = cell.paragraphs[0].add_run('Brain inkl. PTV')
+    cell.font.subscript = True
+    cell = table.cell(5, 0)
+    cell = cell.paragraphs[0].add_run('(24 Gy)')
+    
+    cell = table.cell(5, 1)
+    cell.text = f"{V_hirn_D24Gy} cm³"
+    
+    
+    cell = table.cell(6, 0)
+    cell = cell.paragraphs[0].add_run('D')
+    cell = table.cell(6, 0)
+    cell = cell.paragraphs[0].add_run('median')
+    cell.font.subscript = True
+    
+    cell = table.cell(6, 1)
+    cell.text = f"{D_med_Gy_hirn} Gy"
+
+
+        
+def create_output(search_word, D_max=False, D_V2=False, D_mean=False):
+    
+    
+    if search_word in open('dvh.txt').read():
+
+        doc.add_heading(search_word, 3)
+        para = doc.add_paragraph().add_run()
+
+        if (D_max and D_V2 and D_mean):
+            table = doc.add_table(rows=3, cols=2)
+            
+            cell = table.cell(0, 0)
+            cell = cell.paragraphs[0].add_run('D')
+            cell = table.cell(0, 0)
+            cell = cell.paragraphs[0].add_run('max')
+            cell.font.subscript = True
+        
+            cell = table.cell(0, 1)
+            cell.text = f"{D_max} Gy"
+        
+            cell = table.cell(1, 0)
+            cell = cell.paragraphs[0].add_run('D')
+            cell = table.cell(1, 0)
+            cell = cell.paragraphs[0].add_run('near-max')
+            cell.font.subscript = True
+            cell = table.cell(1, 0)
+            cell = cell.paragraphs[0].add_run('(V=2 %)')
+        
+            cell = table.cell(1, 1)
+            cell.text = f"{D_V2} Gy"
+            
+            cell = table.cell(2, 0)
+            cell = cell.paragraphs[0].add_run('D')
+            cell = table.cell(2, 0)
+            cell = cell.paragraphs[0].add_run('mean')
+            cell.font.subscript = True
+        
+            cell = table.cell(2, 1)
+            cell.text = f"{D_mean} Gy"
+            
+        elif (D_max and D_V2):
+            table = doc.add_table(rows=2, cols=2)
+            
+            cell = table.cell(0, 0)
+            cell = cell.paragraphs[0].add_run('D')
+            cell = table.cell(0, 0)
+            cell = cell.paragraphs[0].add_run('max')
+            cell.font.subscript = True
+        
+            cell = table.cell(0, 1)
+            cell.text = f"{D_max} Gy"
+        
+        
+            cell = table.cell(1, 0)
+            cell = cell.paragraphs[0].add_run('D')
+            cell = table.cell(1, 0)
+            cell = cell.paragraphs[0].add_run('near-max')
+            cell.font.subscript = True
+            cell = table.cell(1, 0)
+            cell = cell.paragraphs[0].add_run('(V=2 %)')
+        
+            cell = table.cell(1, 1)
+            cell.text = f"{D_V2} Gy"
+            
+        elif (D_mean):
+            table = doc.add_table(rows=1, cols=2)
+            
+            cell = table.cell(0, 0)
+            cell = cell.paragraphs[0].add_run('D')
+            cell = table.cell(0, 0)
+            cell = cell.paragraphs[0].add_run('mean')
+            cell.font.subscript = True
+        
+            cell = table.cell(0, 1)
+            cell.text = f"{D_mean} Gy"
+    else: print('Struktur ' +search_word+' wurde nicht zur Auswertung ausgewählt.')  
+
+create_output(' Bladder', D_max_Gy_bladder, D_V2_bladder, D_mean_bladder)
+create_output(' z_Bladder', D_max_Gy_z_bladder, D_V2_z_bladder, D_mean_z_bladder)
+create_output(' Brainstem', D_max_Gy_hs, D_V2_hs, D_mean_brainstem)
+create_output(' Chiasm', D_max_Gy_Chiasm, D_V2_Chiasm, D_mean_chiasm)
+create_output(' Cochlea_L', D_max_Gy_Cochlea_L, D_V2_Cochlea_L)
+create_output(' Cochlea_R', D_max_Gy_Cochlea_R, D_V2_Cochlea_R)
+create_output(' Duodenum', D_max_Gy_duodenum, D_V2_duodenum,D_mean_duodenum)
+create_output(' Heart', D_max_Gy_heart, D_V2_heart, D_mean_heart)
+create_output(' Intestine', D_max_Gy_intestine, D_V2_intestine, D_mean_intestine)
+create_output(' Kidney_L', D_max_Gy_kidney_l, D_V2_kidney_l, D_mean_kidney_l)
+create_output(' Kidney_R', D_max_Gy_kidney_r, D_V2_kidney_r, D_mean_kidney_r)
+create_output(' Lens_L', D_max_Gy_lens_li, D_V2_lens_li, D_mean_lens_li)
+create_output(' Lens_R', D_max_Gy_lens_re, D_V2_lens_re, D_mean_lens_re)
+create_output(' Liver', D_max_Gy_liver, D_V2_liver, D_mean_liver)
+create_output(' Lung_L', D_max_Gy_lung_l, D_V2_lung_l, D_mean_lung_l)
+create_output(' Lung_R', D_max_Gy_lung_r, D_V2_lung_r, D_mean_lung_r)
+create_output(' Mandible', D_max_Gy_mandible, D_V2_mandible, D_mean_mandible)
+
+create_output(' Oesophagus', D_max_Gy_oeso, D_V2_oeso, D_mean_oeso)
+create_output(' OpticNerve_L', D_max_Gy_opt_li, D_V2_opt_li, D_mean_opt_li)
+create_output(' OpticNerve_R', D_max_Gy_opt_re, D_V2_opt_re, D_mean_opt_re)
+create_output(' Oral_Cavity', D_max_Gy_oral_cavity, D_V2_oral_cavity, D_mean_oral_cavity)
+create_output(' Pancreas', D_max_Gy_pancreas, D_V2_pancreas, D_mean_pancreas)
+create_output(' Parotid_L', D_max_Gy_parotid_L, D_V2_parotid_L, D_mean_parotid_L)
+create_output(' Parotid_R', D_max_Gy_parotid_R, D_V2_parotid_R, D_mean_parotid_R)
+create_output(' RIVA', D_max_Gy_riva, D_V2_riva, D_mean_riva)
+create_output(' SpinalCanal', D_max_Gy_spinalcanal, D_V2_spinalcanal)
+create_output(' SpinalCord', D_max_Gy_myelon, D_V2_myelon)
+create_output(' Submandibula_L', D_max_Gy_submandibula_l, D_V2_submandibula_l, D_mean_submandibula_l)
+create_output(' Submandibula_R', D_max_Gy_submandibula_r, D_V2_submandibula_r, D_mean_submandibula_r)
+
+# Fußzeile hinzufügen
+# >= in Unicode
+s = u'\u2265'
+# <= in Unicode
+t = u'\u2264'
+section = doc.sections[0] 
+footer = section.footer
+
+#footer.is_linked_to_previous = True
+#first_page_footer 
+footer_para = footer.paragraphs[0].add_run('* Berechnung nach ICRU report 91 on prescribing, recording, and reporting of'+
+' stereotactic treatments with small photon beams - Statement from the DEGRO/DGMP working group stereotactic radiotherapy and surgery (2019), wobei hier Paddick = 1/CI')
+font = footer_para.font
+font.size = Pt(7)
+footer_para.add_break()
+footer_para = footer.paragraphs[0].add_run(f'Paddick Conformity Index {t} 0.5 rot, 0.5 < PCI < 0.7 gelb, {s} 0.7 grün')
+font = footer_para.font
+font.size = Pt(7)
+footer_para.add_break()
+footer_para = footer.paragraphs[0].add_run(f'Gradient Index {t} 4 grün, 4 < GI < 6 gelb, {s} 6 rot')
+font = footer_para.font
+font.size = Pt(7)
+
+
+
+# lösche dvh.txt
+#os.remove("dvh.txt")
+#print('Datei dvh.txt erfolgreich gelöscht')
+
+
+import time
+today = time.strftime("%Y%m%d-%H%M%S")
+
+# Now save the document to a location 
+# doc.save(f'{nachname}, {vorname} ({ID})_{today}.docx')
+
+
+# Now save the document to a location 
+path = f'C:/Users/gunni/Desktop/Python_Programm_Schwerin/{nachname}, {vorname} ({ID})'
+
+if os.path.isdir(path):
+    print('Dateipfad bereits vorhanden.')
+    doc.save(f'{path}/{nachname}, {vorname} ({ID})_{today}.docx')
+#erstellt ein .pdf-Dokument aus dem .docx-Protokoll
+    convert(f'{path}/{nachname}, {vorname} ({ID})_{today}.docx')#,OtherFolder(AC_Export?\{nachname}, {vorname} ({ID})_{today}.pdf')
+else:
+    print('Dateipfad angelegt.')
+    os.makedirs(path)
+    doc.save(f'{path}/{nachname}, {vorname} ({ID})_{today}.docx')
+#erstellt ein .pdf-Dokument aus dem .docx-Protokoll
+    convert(f'{path}/{nachname}, {vorname} ({ID})_{today}.docx')#,OtherFolder\{nachname}, {vorname} ({ID})_{today}.pdf')
+
+print(f'Erstellen des Reports erfolgreich!\nGespeichert unter C:/Users/gunni/Desktop/Strahlentherapie_Harburg/STT_Harburg/Stereotaxie/Scripting/Python_Programm_Schwerin/{nachname}, {vorname} ({ID})')
+
+input("Enter zum Beenden...")
+
+
+
+
+
