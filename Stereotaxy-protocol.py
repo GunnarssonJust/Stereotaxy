@@ -184,10 +184,10 @@ D_V50, D_V50_rel = find_D_Vx(50, rel_volumes_ptv)
 
 
 
-V_ptv_D100 = dvh_ptv[np.where(rel_doses_ptv==100),2]# Ergebnis in %
+V_ptv_D100 = dvh_ptv[np.where(rel_doses_ptv==100),2]# result in %
 #change type of V_ptv_D100 from array to scalar float
 V_ptv_D100 = float(np.take(V_ptv_D100,0))
-V_ptv_D100 = float(V_ptv_D100)/100*float(ptv_volume) # Ergebnis in cm³
+V_ptv_D100 = float(V_ptv_D100)/100*float(ptv_volume) # result in cm³
 
 # calculate D(V-35mm³) and D(V=35mm³), 35 mm³ according to ICRU91
 x = float(ptv_volume) - 0.035 # cm³
@@ -217,8 +217,8 @@ print(V_iso_D50)
 # corpse volume
 corpse_volume = matrix[read_from_line(search_string_in_file('dvh.txt', 'Body')-1, 'Volume')][2]
 
-V_iso_D100 = float(V_iso_D100)/100*float(corpse_volume) # Ergebnis in cm³
-V_iso_D50 = float(V_iso_D50)/100*float(corpse_volume) # Ergebnis in cm³
+V_iso_D100 = float(V_iso_D100)/100*float(corpse_volume) # result in cm³
+V_iso_D50 = float(V_iso_D50)/100*float(corpse_volume) # result in cm³
 
 paddick = float(V_ptv_D100)**2/(float(ptv_volume)*float(V_iso_D100))
 #print(corpse_volume)
@@ -250,7 +250,7 @@ def findV_Dx(x, dvh, abs_doses, volume, volumePTV):
 
     return V_DxGy, V_DxGy_noPTV
 
-# Hirn___________________________________________________________________________
+# brain___________________________________________________________________________
 
 if 'Structure: Brain' in open('dvh.txt').read():
 
@@ -279,7 +279,7 @@ if 'Structure: Brain' in open('dvh.txt').read():
 def output_max(search_structure, structure):
     # structures of risk
     D_max_Gy = find_value(search_structure, 'Max')
-    # prüfe, ob Variable überhaupt vergeben ist
+    # prove, whether variable has value
     if D_max_Gy:
         D_max_Gy = D_max_Gy[0]
         dvh, abs_doses, rel_doses = create_DVH_and_abs_rel_doses(structure)
@@ -301,7 +301,7 @@ def output_mean(search_structure):
     return D_mean
 
 #TODO: Enter organs at risk of thorax region
-##alphabetical order
+##alphabetical order, for loop over array of Structure names, string array by using output_metrics method= output max+output_mean and create output
 D_max_Gy_bladder, D_V2_bladder, D_V2_rel_bladder = output_max('Structure: Bladder', 'Bladder')
 D_mean_bladder = output_mean('Structure: Bladder')
 D_max_Gy_z_bladder, D_V2_z_bladder, D_V2_rel_z_bladder = output_max('Structure: z_Bladder', 'z_Bladder')
@@ -421,7 +421,7 @@ cell = table.cell(1,1)
 cell.text = f"{coursename}"
 
 cell = table.cell(2, 0)
-cell.text = f"Plan-Dosis ("+ str(dose_in_percent) +" %)"
+cell.text = f"Planned-Dose ("+ str(dose_in_percent) +" %)"
 cell = table.cell(2,1)
 cell.text = f"{dosis_verschrieben} Gy"
 
@@ -745,7 +745,7 @@ create_output(' SpinalCord', D_max_Gy_myelon, D_V2_myelon)
 create_output(' Submandibula_L', D_max_Gy_submandibula_l, D_V2_submandibula_l, D_mean_submandibula_l)
 create_output(' Submandibula_R', D_max_Gy_submandibula_r, D_V2_submandibula_r, D_mean_submandibula_r)
 
-# Fußzeile hinzufügen
+# Add footnote
 # >= in Unicode
 s = u'\u2265'
 # <= in Unicode
@@ -787,7 +787,7 @@ path = f'C:/Users/Your_username/Desktop//{lastname}, {firstname} ({ID})'
 #or save wherever You want
 
 if os.path.isdir(path):
-    print('Directory stil exists.')
+    print('Directory still exists.')
     doc.save(f'{path}/{lastname}, {firstname} ({ID})_{today}.docx')
 #creates a .pdf-document from .docx-Protocol
     convert(f'{path}/{lastname}, {firstname} ({ID})_{today}.docx')#,OtherFolder(AC_Export?\{lastname}, {firstname} ({ID})_{today}.pdf')
@@ -798,9 +798,9 @@ else:
 #erstellt ein .pdf-Dokument aus dem .docx-Protokoll
     convert(f'{path}/{lastname}, {firstname} ({ID})_{today}.docx')#,OtherFolder\{lastname}, {firstname} ({ID})_{today}.pdf')
 
-print(f'Erstellen des Reports erfolgreich!\nGespeichert unter C:/Users/gunni/Desktop/Strahlentherapie_Harburg/STT_Harburg/Stereotaxie/Scripting/Python_Programm_Schwerin/{lastname}, {firstname} ({ID})')
-
-input("Enter to finish .py program...")
+print(f'Creating report was successful!\nSaved to C:/Users/username/Desktop/{lastname}, {firstname} ({ID})')
+#or path of Your choice
+input("Press Enter key to finish .py program...")
 
 
 
