@@ -545,7 +545,7 @@ para = doc.add_paragraph().add_run()
 # # # # # # # # # If Organs at Risk should be evaluated: delete comment# 
 #Organs at risk at next page, Open Office gives a changed Layout, Format than Word!!!
 # doc.add_page_break()
-doc.add_heading('Risikoorgane', 2)
+doc.add_heading('Organs At Risk', 2)
 
 # Brain-Evaluation
 
