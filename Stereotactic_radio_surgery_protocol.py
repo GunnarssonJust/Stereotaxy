@@ -4,7 +4,7 @@ Created on Tue Mar  8 15:23:55 2022
 Modified for criteria in Helios Clinics Schwerin, Germany on Sat Nov 23-30 2024
 .exe-file created with auto-py-to-exe
 
-@authors: Gunnar Just
+@authors: Gunnar Just et al.
 """
 
 
