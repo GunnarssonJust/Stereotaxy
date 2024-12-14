@@ -120,11 +120,13 @@ def find_value(search_word1, search_word2):
 # If there are more than one PTV in DVH, f.e. PTV1, PTV2, etc.:
 if 'Structure: PTV ' in open('dvh.txt').read():
     ptv_volume_name = 'Structure: PTV '
+	ptv_name = 'PTV'				
 else:
     ROOT_2 = tk.Tk()
     ROOT_2.withdraw()
     USER_INPUT = simpledialog.askstring(title='Name of Target volume',prompt = 'The name of target volume is not explicit. \n Please enter the name of the treated volume: ')
     ptv_volume_name = 'Structure: ' +USER_INPUT
+	ptv_name = USER_INPUT					 
 
 if USER_INPUT in open('dvh.txt').read():    
     #type (ptv_volume) = String    
@@ -234,9 +236,15 @@ GI = round(GI, 2)
 
 
 ###############################################################################
-# ORGANS AT RISK   ############################################################
+### ORGANS AT RISK   PLZ EDIT THIS NAMES ACCORDING TO YOUR STRUCTURE SETS   ###
 ###############################################################################
+structure_set_head = ['Brainstem','Chiasm','Cochlea_L', 'Cochlea_R','Eye_L','Eye_R','Lens_L','Lens_R','Mandible','OpticNerve_L','OpticNerve_R','Oral_Cavity','Parotid_L','Parotid_R','Submandibula_L','Submandibula_R']
+structure_set_thorax = ['Heart','Lung_L','Lung_R','Oesophagus','RIVA']
+structure_set_abdomen = ['Bladder', 'z_Bladder', 'Duodenum','Intestine','Kidney_L','Kidney_R','Liver','Pancreas','SpinalCanal','SpinalCord']
 
+structure_set =  structure_set_head+structure_set_thorax+structure_set_abdomen
+structure_set = sorted(structure_set)
+structure_set = np.array(structure_set)
 
 def findV_Dx(x, dvh, abs_doses, volume, volumePTV):
     V_DxGy = dvh[np.argmin(abs(abs_doses-x)),2] #result in %
@@ -276,10 +284,10 @@ if 'Structure: Brain' in open('dvh.txt').read():
 
 # Brain calculations end here________________________________________________________________________________________________________
 
-def output_max(search_structure, structure):
-    # structures of risk
+def output_metrics(search_structure, structure):
+    # Risikostruktur
     D_max_Gy = find_value(search_structure, 'Max')
-    # prove, whether variable has value
+    # prüfe, ob Variable überhaupt vergeben ist
     if D_max_Gy:
         D_max_Gy = D_max_Gy[0]
         dvh, abs_doses, rel_doses = create_DVH_and_abs_rel_doses(structure)
@@ -287,91 +295,15 @@ def output_max(search_structure, structure):
         D_V2, D_V2_rel = find_D_Vx(2, rel_volumes)
     else:
         D_max_Gy, D_V2, D_V2_rel = None, None, None
-    
-    return D_max_Gy, D_V2, D_V2_rel
-
-def output_mean(search_structure):
+                                  
     D_mean = find_value(search_structure, 'Mean')
-     # prove, whether variable is assigned
+     # prüfe, ob Variable überhaupt vergeben ist
     if D_mean:
         D_mean = D_mean[0]
     else:
         D_mean = None
-    
-    return D_mean
 
-#TODO: Enter organs at risk of thorax region
-##alphabetical order, for loop over array of Structure names, string array by using output_metrics method= output max+output_mean and create output
-D_max_Gy_bladder, D_V2_bladder, D_V2_rel_bladder = output_max('Structure: Bladder', 'Bladder')
-D_mean_bladder = output_mean('Structure: Bladder')
-D_max_Gy_z_bladder, D_V2_z_bladder, D_V2_rel_z_bladder = output_max('Structure: z_Bladder', 'z_Bladder')
-D_mean_z_bladder = output_mean('Structure: z_Bladder')
-D_mean_bladder = output_mean('Structure: z_Bladder')
-D_max_Gy_hs, D_V2_hs, D_V2_rel_hs = output_max('Structure: Brainstem', 'Brainstem')
-D_mean_brainstem = output_mean('Structure: Brainstem')
-D_max_Gy_Chiasm, D_V2_Chiasm, D_V2_rel_Chiasm = output_max('Structure: Chiasm', 'Chiasm')
-D_mean_chiasm = output_mean('Structure: Chiasm')
-D_max_Gy_Cochlea_L, D_V2_Cochlea_L, D_V2_rel_Cochlea_L = output_max('Structure: Cochlea_L', 'Cochlea_L')
-D_max_Gy_Cochlea_R, D_V2_Cochlea_R, D_V2_rel_Cochlea_R = output_max('Structure: Cochlea_R', 'Cochlea_R')
-D_max_Gy_duodenum, D_V2_duodenum, D_V2_rel_duodenum = output_max('Structure: Duodenum', 'Duodenum')
-D_mean_duodenum = output_mean('Structure: Duodenum')
-
-D_max_Gy_eye_L, D_V2_eye_L, D_V2_rel_eye_L = output_max('Structure: Eye_L', 'Eye_L')
-D_mean_eye_L = output_mean('Structure: Eye_L')
-D_max_Gy_eye_R, D_V2_eye_R, D_V2_rel_eye_R = output_max('Structure: Eye_R', 'Eye_R')
-D_mean_eye_R = output_mean('Structure: Eye_R')
-
-D_max_Gy_heart, D_V2_heart, D_V2_rel_heart = output_max('Structure: Heart', 'Heart')
-D_mean_heart = output_mean('Structure: Heart')
-
-D_max_Gy_intestine, D_V2_intestine, D_V2_rel_intestine = output_max('Structure: Intestine', 'Intestine')
-D_mean_intestine = output_mean('Structure: Intestine')
-D_max_Gy_kidney_l, D_V2_kidney_l, D_V2_rel_kidney_l = output_max('Structure: Kidney_L', 'Kidney_L')
-D_mean_kidney_l = output_mean('Structure: Kidney_L')
-D_max_Gy_kidney_r, D_V2_kidney_r, D_V2_rel_kidney_r = output_max('Structure: Kidney_R', 'Kidney_R')
-D_mean_kidney_r = output_mean('Structure: Kidney_R')
-
-D_max_Gy_lens_li, D_V2_lens_li, D_V2_rel_lens_li = output_max('Structure: Lens_L', 'Lens_L')
-D_mean_lens_li = output_mean('Structure: Lens_L')
-D_max_Gy_lens_re, D_V2_lens_re, D_V2_rel_lens_re = output_max('Structure: Lens_R', 'Lens_R')
-D_mean_lens_re = output_mean('Structure: Lens_R')
-D_max_Gy_liver, D_V2_liver, D_V2_rel_liver = output_max('Structure: Liver', 'Liver')
-D_mean_liver = output_mean('Structure: Liver')
-D_max_Gy_lung_l, D_V2_lung_l, D_V2_rel_lung_l = output_max('Structure: Lung_L', 'Lung_L')
-D_mean_lung_l = output_mean('Structure: Lung_L')
-D_max_Gy_lung_r, D_V2_lung_r, D_V2_rel_lung_r = output_max('Structure: Lung_R', 'Lung_R')
-D_mean_lung_r = output_mean('Structure: Lung_R')
-D_max_Gy_mandible, D_V2_mandible, D_V2_rel_mandible = output_max('Structure: Mandible', 'Mandible')
-D_mean_mandible = output_mean('Structure: Mandible')
-D_max_Gy_oeso, D_V2_oeso, D_V2_rel_oeso = output_max('Structure: Oesophagus', 'Oesophagus')
-D_mean_oeso = output_mean('Structure: Oesophagus')
-
-D_max_Gy_opt_li, D_V2_opt_li, D_V2_rel_opt_li = output_max('Structure: OpticNerve_L', 'OpticNerve_L')
-D_mean_opt_li = output_mean('Structure: OpticNerve_L')
-D_max_Gy_opt_re, D_V2_opt_re, D_V2_rel_opt_re = output_max('Structure: OpticNerve_R', 'OpticNerve_R')
-D_mean_opt_re = output_mean('Structure: OpticNerve_R')
-D_max_Gy_oral_cavity, D_V2_oral_cavity, D_V2_rel_oral_cavity = output_max('Structure: Oral_Cavity', 'Oral_Cavity')
-D_mean_oral_cavity = output_mean('Structure: Oral_Cavity')
-D_max_Gy_pancreas, D_V2_pancreas, D_V2_rel_pancreas = output_max('Structure: Pancreas', 'Pancreas')
-D_mean_pancreas = output_mean('Structure: Pancreas')
-D_max_Gy_parotid_L, D_V2_parotid_L, D_V2_rel_parotid_L = output_max('Structure: Parotid_L', 'Parotid_L')
-D_mean_parotid_L = output_mean('Structure: Parotid_L')
-D_max_Gy_parotid_R, D_V2_parotid_R, D_V2_rel_parotid_R = output_max('Structure: Parotid_R', 'Parotid_R')
-D_mean_parotid_R = output_mean('Structure: Parotid_R')
-
-D_max_Gy_riva, D_V2_riva, D_V2_rel_riva = output_max('Structure: RIVA', 'RIVA')
-D_mean_riva = output_mean('Structure: RIVA')
-
-D_max_Gy_spinalcanal, D_V2_spinalcanal, D_V2_rel_spinalcanal = output_max('Structure: SpinalCanal', 'SpinalCanal')
-D_max_Gy_myelon, D_V2_myelon, D_V2_rel_myelon = output_max('Structure: SpinalCord', 'SpinalCord')
-D_max_Gy_submandibula_l, D_V2_submandibula_l, D_V2_rel_submandibula_l = output_max('Structure: Submandibula_L', 'Submandibula_L')
-D_mean_submandibula_l = output_mean('Structure: Submandibula_L')
-
-D_max_Gy_submandibula_r, D_V2_submandibula_r, D_V2_rel_submandibula_r = output_max('Structure: Submandibula_R', 'Submandibula_R')
-D_mean_submandibula_r = output_mean('Structure: Submandibula_R')
-#D_max_Gy_ , D_V2_ , D_V2_rel_ = output_max('Structure: ', '')
-
-
+	return D_max_Gy, D_V2, D_V2_rel, D_mean
 
 
 ###############################################################################
@@ -434,7 +366,7 @@ cell.text = f"{round(float(dosis_100)/dose_in_percent*100,2)} Gy"
 
 # PTV- Evaluation
 
-doc.add_heading('PTV', 3)
+doc.add_heading(ptv_name, 3)
 # Volumen, Paddick, Gradient, Dnearminx2, Dnearmaxx2, D50, D mean
 
 para = doc.add_paragraph().add_run()
@@ -541,9 +473,11 @@ cell.text = f"{D_mean_Gy} Gy bzw. {D_mean_per} % of Planned-Dose"
 para = doc.add_paragraph().add_run()
 para = doc.add_paragraph().add_run()
 
-##############################################################################
-# # # # # # # # # If Organs at Risk should be evaluated: delete comment# 
-#Organs at risk at next page, Open Office gives a changed Layout, Format than Word!!!
+############################################################################################
+### If Organs at Risk should be evaluated: delete comment                                ###
+### Organs at risk at next page, Open Office gives a changed Layout, Format than Word!!! ###
+############################################################################################
+
 # doc.add_page_break()
 doc.add_heading('Organs At Risk', 2)
 
@@ -714,36 +648,10 @@ def create_output(search_word, D_max=False, D_V2=False, D_mean=False):
             cell.text = f"{D_mean} Gy"
     else: print('Structure ' +search_word+' was not chosen for evaluation.')  
 
-create_output(' Bladder', D_max_Gy_bladder, D_V2_bladder, D_mean_bladder)
-create_output(' z_Bladder', D_max_Gy_z_bladder, D_V2_z_bladder, D_mean_z_bladder)
-create_output(' Brainstem', D_max_Gy_hs, D_V2_hs, D_mean_brainstem)
-create_output(' Chiasm', D_max_Gy_Chiasm, D_V2_Chiasm, D_mean_chiasm)
-create_output(' Cochlea_L', D_max_Gy_Cochlea_L, D_V2_Cochlea_L)
-create_output(' Cochlea_R', D_max_Gy_Cochlea_R, D_V2_Cochlea_R)
-create_output(' Duodenum', D_max_Gy_duodenum, D_V2_duodenum,D_mean_duodenum)
-create_output(' Heart', D_max_Gy_heart, D_V2_heart, D_mean_heart)
-create_output(' Intestine', D_max_Gy_intestine, D_V2_intestine, D_mean_intestine)
-create_output(' Kidney_L', D_max_Gy_kidney_l, D_V2_kidney_l, D_mean_kidney_l)
-create_output(' Kidney_R', D_max_Gy_kidney_r, D_V2_kidney_r, D_mean_kidney_r)
-create_output(' Lens_L', D_max_Gy_lens_li, D_V2_lens_li, D_mean_lens_li)
-create_output(' Lens_R', D_max_Gy_lens_re, D_V2_lens_re, D_mean_lens_re)
-create_output(' Liver', D_max_Gy_liver, D_V2_liver, D_mean_liver)
-create_output(' Lung_L', D_max_Gy_lung_l, D_V2_lung_l, D_mean_lung_l)
-create_output(' Lung_R', D_max_Gy_lung_r, D_V2_lung_r, D_mean_lung_r)
-create_output(' Mandible', D_max_Gy_mandible, D_V2_mandible, D_mean_mandible)
-
-create_output(' Oesophagus', D_max_Gy_oeso, D_V2_oeso, D_mean_oeso)
-create_output(' OpticNerve_L', D_max_Gy_opt_li, D_V2_opt_li, D_mean_opt_li)
-create_output(' OpticNerve_R', D_max_Gy_opt_re, D_V2_opt_re, D_mean_opt_re)
-create_output(' Oral_Cavity', D_max_Gy_oral_cavity, D_V2_oral_cavity, D_mean_oral_cavity)
-create_output(' Pancreas', D_max_Gy_pancreas, D_V2_pancreas, D_mean_pancreas)
-create_output(' Parotid_L', D_max_Gy_parotid_L, D_V2_parotid_L, D_mean_parotid_L)
-create_output(' Parotid_R', D_max_Gy_parotid_R, D_V2_parotid_R, D_mean_parotid_R)
-create_output(' RIVA', D_max_Gy_riva, D_V2_riva, D_mean_riva)
-create_output(' SpinalCanal', D_max_Gy_spinalcanal, D_V2_spinalcanal)
-create_output(' SpinalCord', D_max_Gy_myelon, D_V2_myelon)
-create_output(' Submandibula_L', D_max_Gy_submandibula_l, D_V2_submandibula_l, D_mean_submandibula_l)
-create_output(' Submandibula_R', D_max_Gy_submandibula_r, D_V2_submandibula_r, D_mean_submandibula_r)
+for structure in structure_set:
+    if structure in open('dvh.txt').read():
+        D_max,D_V2,D_rel_Gy,D_mean = output_metrics('Structure: '+structure,structure)
+        create_output(' '+structure,D_max,D_V2,D_mean)
 
 # Add footnote
 # >= in Unicode
@@ -795,14 +703,9 @@ else:
     print('Directory created honestly.')
     os.makedirs(path)
     doc.save(f'{path}/{lastname}, {firstname} ({ID})_{today}.docx')
-#erstellt ein .pdf-Dokument aus dem .docx-Protokoll
+#creates a .pdf-file from .docx-Protokoll
     convert(f'{path}/{lastname}, {firstname} ({ID})_{today}.docx')#,OtherFolder\{lastname}, {firstname} ({ID})_{today}.pdf')
 
 print(f'Creating report was successful!\nSaved to C:/Users/username/Desktop/{lastname}, {firstname} ({ID})')
 #or path of Your choice
 input("Press Enter key to finish .py program...")
-
-
-
-
-
